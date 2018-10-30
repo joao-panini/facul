@@ -33,6 +33,7 @@ public class RedisJava {
 		String partida;
 		String resultadoApostado;
 		String strConc;
+		List<String> Resultados ;
 
 
 		while (op != 0) {
@@ -69,6 +70,10 @@ public class RedisJava {
 
 							strConc = rodada + "_" + partida + "_" + resultadoApostado;
 							jedis.sadd("APOSTAS:"+apelido,strConc);
+							
+							if (jedis.smembers()) {
+								
+							}
 							
 							
 
@@ -152,7 +157,7 @@ public class RedisJava {
 						Random r = new Random();
 						c = alf.charAt(r.nextInt(N));
 						String s = Character.toString(c);
-						jedis.rpush("RODADA:IDRODADA"+i,":PARTIDA"+j);
+						jedis.zadd("RODADA:IDRODADA:"+i+":RESULTADO", 0, Integer.toString(c));
 						strConc = i + "_" + j + "_" + s;
 					}
 				}
