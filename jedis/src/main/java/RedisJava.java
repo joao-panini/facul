@@ -1,5 +1,6 @@
 import java.util.*;
-import redis.clients.jedis.Jedis; 
+import redis.clients.jedis.Jedis;
+import redis.clients.jedis.Tuple; 
 
 public class RedisJava { 
 	@SuppressWarnings("resource")
@@ -27,13 +28,17 @@ public class RedisJava {
 		String complemento;
 		String codigopostal;
 		String listmemb;
+		int pontuacao;
 
 		//Variaveis aposta
 		String rodada;
 		String partida;
 		String resultadoApostado;
 		String strConc;
-		List<String> Resultados ;
+		String resultadofoda;
+		List<String> Resultados;
+		Set<String> Usuarios;
+		Set<Tuple> Ranking;
 
 
 		while (op != 0) {
@@ -55,11 +60,12 @@ public class RedisJava {
 
 					System.out.println("1 - APOSTAR");
 					System.out.println("2 - LISTAR APOSTAS POR USUARIO");
+					System.out.println("3 - RANKING");
 					op = writer.nextInt();
 					switch(op) {
 					case 1:
 						String continuar = "S";
-						while (continuar == "S") {
+						while (continuar.equalsIgnoreCase("S")) {
 							writer = new Scanner(System.in);
 							System.out.println("INSIRA A RODADA (1-38)");
 							rodada = writer.nextLine();
@@ -71,10 +77,16 @@ public class RedisJava {
 							strConc = rodada + "_" + partida + "_" + resultadoApostado;
 							jedis.sadd("APOSTAS:"+apelido,strConc);
 							
-							if (jedis.smembers()) {
-								
-							}
+							String resultadoPartidaApostada = jedis.hget("rodada:"+rodada+":partida:"+partida, "resultado");
 							
+							if (resultadoPartidaApostada.equals(resultadoApostado)) {
+								pontuacao = Integer.parseInt(jedis.hget("USUARIO:"+apelido, "SCORE"));
+								pontuacao++;
+								jedis.hset("USUARIO:"+apelido, "SCORE", Integer.toString(pontuacao));
+								System.out.println("ACERTOU!!");
+							}else {
+								System.out.println("ERROU!!");
+							}
 							
 
 							System.out.println("Aposta concluida!");
@@ -96,6 +108,25 @@ public class RedisJava {
 							System.out.println("\n");
 						}
 						break;
+					case 3:
+						writer = new Scanner(System.in);
+						Usuarios = jedis.zrange("APELIDO", 0, -1);
+						pontuacao = 0;
+						
+						for (String user : Usuarios) {
+							pontuacao = Integer.parseInt(jedis.hget("USUARIO:"+apelido, "SCORE"));
+							jedis.zadd("RANKING",pontuacao,user);
+						}
+						
+						Ranking = jedis.zrangeWithScores("RANKING", 0, -1);
+						System.out.println("--- RANKING ---\n");
+						for (Tuple rtuple : Ranking) {
+							System.out.println("Apelido: "+ rtuple.getElement());
+							System.out.println("Pontos: "+ rtuple.getScore()+ "\n");
+						}
+						
+						
+						
 					}
 
 
@@ -104,43 +135,45 @@ public class RedisJava {
 
 					System.out.println("Insira seu apelido:");
 					apelido = writer.nextLine();
-					jedis.hset("USUARIO:"+apelido," APELIDO ", apelido);
-
+					jedis.hset("USUARIO:"+apelido,"APELIDO", apelido);
+					
 					System.out.println("Insira seu nome completo:");
 					nome = writer.nextLine();
-					jedis.hset("USUARIO:"+apelido," NOME ", nome);
+					jedis.hset("USUARIO:"+apelido,"NOME", nome);
 
 					System.out.println("Insira sua data de nascimento:");
 					datanasc = writer.nextLine();
-					jedis.hset("USUARIO:"+apelido," DATA_NASCIMENTO ", datanasc);
+					jedis.hset("USUARIO:"+apelido,"DATA_NASCIMENTO", datanasc);
 
 					System.out.println("Insira seu genero(M/F):");
 					genero = writer.nextLine();
-					jedis.hset("USUARIO:"+apelido," GENERO ", genero);
+					jedis.hset("USUARIO:"+apelido,"GENERO", genero);
 
 					System.out.println("Insira seu pais:");
 					pais = writer.nextLine();
-					jedis.hset("USUARIO:"+apelido," PAIS ", pais);
+					jedis.hset("USUARIO:"+apelido,"PAIS", pais);
 
 					System.out.println("Insira seu estado:");
 					estado = writer.nextLine();
-					jedis.hset("USUARIO:"+apelido," ESTADO ", estado);
+					jedis.hset("USUARIO:"+apelido,"ESTADO", estado);
 
 					System.out.println("Insira o nome da sua cidade:");
 					cidade = writer.nextLine();
-					jedis.hset("USUARIO:"+apelido," CIDADE ", cidade);
+					jedis.hset("USUARIO:"+apelido,"CIDADE", cidade);
 
 					System.out.println("Insira o nome da sua rua:");
 					rua = writer.nextLine();
-					jedis.hset("USUARIO:"+apelido," RUA ", rua);
+					jedis.hset("USUARIO:"+apelido,"RUA", rua);
 
 					System.out.println("Insira o complemento:");
 					complemento = writer.nextLine();
-					jedis.hset("USUARIO:"+apelido," COMPLEMENTO ", complemento);
+					jedis.hset("USUARIO:"+apelido,"COMPLEMENTO", complemento);
 
 					System.out.println("Insira o código postal:");
 					codigopostal = writer.nextLine();
-					jedis.hset("USUARIO:"+apelido," CODIGO_POSTAL ", codigopostal);
+					jedis.hset("USUARIO:"+apelido,"CODIGO_POSTAL", codigopostal);
+					
+					jedis.hset("USUARIO:"+apelido, "SCORE" , "0");
 					break;
 				}
 
@@ -151,17 +184,55 @@ public class RedisJava {
 				int[] rodadas;
 				char c;
 				rodadas = new int[38];
-				for (int i = 0; i < rodadas.length; i++) {
-					jedis.hset("RODADA:IDRODADA:"+i, "IDRODADA",Integer.toString(i));
-					for (int j = 0; j < 10; j++) {
+				for (int i = 1; i <= 38; i++) {
+					for (int j = 1; j <= 10; j++) {
 						Random r = new Random();
 						c = alf.charAt(r.nextInt(N));
 						String s = Character.toString(c);
-						jedis.zadd("RODADA:IDRODADA:"+i+":RESULTADO", 0, Integer.toString(c));
-						strConc = i + "_" + j + "_" + s;
+						jedis.hset("rodada:"+i+":partida:"+j, "resultado", s);
+						String paraprintar = jedis.hget("rodada:"+i+":partida:"+j, "resultado");
+						System.out.println("Rodada " + i + " Partida " + j + " Resultado " + paraprintar);
 					}
 				}
+				jedis.zadd("APELIDO",1,"JOAO");
+				jedis.zadd("APELIDO",1,"PROFESSOR");
+				jedis.zadd("APELIDO",1,"ALUNO");
+				jedis.zadd("APELIDO",1,"TESTE");
+				
+				
+				jedis.sadd("APOSTAS:JOAO","1_1_B");
+				jedis.sadd("APOSTAS:JOAO","2_1_A");
+				jedis.sadd("APOSTAS:JOAO","3_1_B");
+				jedis.sadd("APOSTAS:JOAO","4_1_E");
+				jedis.sadd("APOSTAS:JOAO","5_1_B");
+				jedis.sadd("APOSTAS:JOAO","6_1_A");
+				jedis.sadd("APOSTAS:JOAO","7_1_B");
+				jedis.sadd("APOSTAS:JOAO","8_1_E");
+				jedis.sadd("APOSTAS:JOAO","9_1_B");
+				jedis.sadd("APOSTAS:JOAO","10_1_A");
+				
+				jedis.sadd("APOSTAS:PROFESSOR","1_2_B");
+				jedis.sadd("APOSTAS:PROFESSOR","2_2_A");
+				jedis.sadd("APOSTAS:PROFESSOR","3_2_B");
+				jedis.sadd("APOSTAS:PROFESSOR","4_2_E");
+				jedis.sadd("APOSTAS:PROFESSOR","5_2_B");
+				jedis.sadd("APOSTAS:PROFESSOR","6_2_A");
+				jedis.sadd("APOSTAS:PROFESSOR","7_2_B");
+				jedis.sadd("APOSTAS:PROFESSOR","8_2_E");
+				jedis.sadd("APOSTAS:PROFESSOR","9_2_B");
+				jedis.sadd("APOSTAS:PROFESSOR","10_2_A");
+				
+				jedis.sadd("APOSTAS:ALUNO","");
+				
+				
+				
+				
 				break;
+			case 3:
+				jedis.hset("rodada:1:partida:1", "resultado", "a");
+				resultadofoda =jedis.hget("rodada:1:partida:1", "resultado");
+				break;
+				
 				default:
 					System.out.println("opcao invalida");
 			}
